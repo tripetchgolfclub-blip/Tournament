@@ -2,259 +2,110 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Golf Leaderboard</title>
 
 <style>
-
 body {
   margin:0;
   font-family: system-ui;
   background:#0B0F14;
   color:#E5E7EB;
-  overflow:hidden;
 }
 
-/* HEADER */
 .header {
   text-align:center;
   padding:10px;
-  font-size:13px;
   border-bottom:1px solid #1F2933;
 }
 
-/* SLIDER */
-.slider {
-  display:flex;
-  width:300%;
-  transition: transform 0.4s ease;
-}
-
-.page {
+.table {
   width:100%;
-  padding:10px;
+  border-collapse: collapse;
 }
 
-/* TITLE */
-.title {
-  font-size:18px;
-  margin:10px 0;
-  color:#FBBF24;
-}
-
-/* ROW */
-.row {
-  display:flex;
-  justify-content:space-between;
-  padding:12px;
+th, td {
+  padding:8px;
+  text-align:center;
   border-bottom:1px solid #1F2933;
-  align-items:center;
 }
 
-/* TOP 3 */
-.top3 {
-  color:#00D084;
-  font-weight:bold;
-}
-
-/* WD */
-.wd {
-  opacity:0.3;
-  text-decoration: line-through;
-}
-
-/* TAGS */
-.tag {
-  font-size:10px;
-  margin-left:5px;
-}
-
-/* LEADER BOX */
-.leader {
-  border:2px solid #00D084;
-  padding:10px;
-  border-radius:12px;
-  text-align:center;
-  margin-bottom:10px;
-}
-
-/* POPUP */
-.popup {
-  position:fixed;
-  top:20px;
-  left:50%;
-  transform:translateX(-50%);
-  background:#00D084;
-  color:#000;
-  padding:10px 20px;
-  border-radius:20px;
-  display:none;
-  font-weight:bold;
-}
-
-/* DOT INDICATOR */
-.indicator {
-  text-align:center;
-  margin-top:5px;
-}
-
-.dot {
-  display:inline-block;
-  width:8px;
-  height:8px;
-  margin:3px;
-  background:#555;
-  border-radius:50%;
-}
-
-.dot.active {
-  background:#00D084;
-}
-
+.rank { color:#22c55e; font-weight:bold; }
+.wd { color:red; }
+.flag { font-size:12px; }
 </style>
 </head>
 
 <body>
 
 <div class="header">
-🏆 TIS Friendly Golf Competition 1/2026<br>
-📍 Rachakram Golf Club | Par 72<br>
-🔴 SWIPE ← →
+  🏆 TIS Friendly Golf Competition
 </div>
 
-<div class="slider" id="slider">
-  <div class="page" id="flightA"></div>
-  <div class="page" id="flightB"></div>
-  <div class="page" id="flightC"></div>
+<div id="loading" style="text-align:center;padding:20px;">
+  ⏳ Loading...
 </div>
 
-<div class="indicator">
-  <span class="dot active"></span>
-  <span class="dot"></span>
-  <span class="dot"></span>
-</div>
-
-<div class="popup" id="popup"></div>
-
-<audio id="sound" src="https://actions.google.com/sounds/v1/crowds/cheer.ogg"></audio>
+<table class="table" id="table" style="display:none;">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Name</th>
+      <th>Net</th>
+      <th>To Par</th>
+      <th>Holes</th>
+      <th>Flags</th>
+    </tr>
+  </thead>
+  <tbody id="body"></tbody>
+</table>
 
 <script>
 
-let current = 0;
-let prevLeader = {A:"",B:"",C:""};
+const API_URL = "https://script.google.com/macros/s/AKfycbzpEvE0ayKwOyMkQ3qcYB_XxP3qxSiaDb-ERVfBjP1YyxpEC8GQ-uyZF5bJKkzxR8Sc/exec"; // 👈 ใส่ของคุณ
 
-/* SWITCH PAGE */
-function showPage(i){
-  current = i;
-  document.getElementById("slider").style.transform =
-    `translateX(-${i*100}%)`;
-
-  document.querySelectorAll(".dot").forEach((d,idx)=>{
-    d.classList.toggle("active", idx===i);
-  });
+function loadData() {
+  fetch(API_URL)
+    .then(res => res.json())
+    .then(data => {
+      render(data);
+      document.getElementById("loading").style.display = "none";
+      document.getElementById("table").style.display = "table";
+    })
+    .catch(err => {
+      console.error(err);
+      document.getElementById("loading").innerHTML = "❌ Load failed";
+    });
 }
 
-/* SWIPE */
-let startX = 0;
+function render(data) {
+  const tbody = document.getElementById("body");
+  tbody.innerHTML = "";
 
-document.addEventListener("touchstart", e=>{
-  startX = e.touches[0].clientX;
-});
+  data.forEach((p, i) => {
 
-document.addEventListener("touchend", e=>{
-  let endX = e.changedTouches[0].clientX;
-  let diff = startX - endX;
+    let flags = "";
+    if (p.WD) flags += "WD ";
+    if (p.LGG) flags += "LGG ";
+    if (p.LNO) flags += "LNO ";
 
-  if(diff > 50 && current < 2) showPage(current+1);
-  if(diff < -50 && current > 0) showPage(current-1);
-});
+    const tr = document.createElement("tr");
 
-/* RENDER */
-function render(data){
-
-  data.sort((a,b)=> a.Net - b.Net || a.Hcp - b.Hcp);
-
-  renderFlight("flightA","A", data.filter(p=>p.Flight==="A"));
-  renderFlight("flightB","B", data.filter(p=>p.Flight==="B"));
-  renderFlight("flightC","C", data.filter(p=>p.Flight==="C"));
-}
-
-function renderFlight(id, flight, list){
-
-  if(list.length===0){
-    document.getElementById(id).innerHTML =
-      `<div class="title">Flight ${flight}</div>No data`;
-    return;
-  }
-
-  let leader = list[0];
-
-  let html = `
-    <div class="title">🏆 Flight ${flight}</div>
-
-    <div class="leader">
-      <div>${leader.Name}</div>
-      <div style="font-size:28px; color:#00D084">${fmt(leader.ToPar)}</div>
-      <div>⛳ ${leader.holes}</div>
-    </div>
-  `;
-
-  list.slice(0,10).forEach((p,i)=>{
-
-    let tags = "";
-    if(p.LGG) tags += "🚀";
-    if(p.LNO) tags += "🎯";
-
-    html += `
-      <div class="row ${i<3?'top3':''} ${p.WD?'wd':''}">
-        <div>
-          ${i+1}. ${short(p.Name)} ${tags}
-        </div>
-        <div>${fmt(p.ToPar)}</div>
-        <div>⛳${p.holes}</div>
-      </div>
+    tr.innerHTML = `
+      <td class="rank">${i+1}</td>
+      <td>${p.Name || "-"}</td>
+      <td>${p.Net}</td>
+      <td>${p.ToPar}</td>
+      <td>${p.holes}</td>
+      <td class="flag">${flags}</td>
     `;
+
+    if (p.WD) tr.classList.add("wd");
+
+    tbody.appendChild(tr);
   });
-
-  document.getElementById(id).innerHTML = html;
-
-  detectLeaderChange(flight, leader.Name);
 }
 
-/* LEADER CHANGE */
-function detectLeaderChange(flight, name){
-  if(prevLeader[flight] && prevLeader[flight] !== name){
-    showPopup(`🔥 New Leader Flight ${flight}: ${name}`);
-    document.getElementById("sound").play();
-  }
-  prevLeader[flight] = name;
-}
-
-/* POPUP */
-function showPopup(text){
-  let p = document.getElementById("popup");
-  p.innerText = text;
-  p.style.display = "block";
-  setTimeout(()=> p.style.display="none", 2000);
-}
-
-/* FORMAT */
-function fmt(s){
-  if(s===0) return "E";
-  if(s>0) return "+"+s;
-  return s;
-}
-
-function short(n){
-  let p = n.split(" ");
-  return p.length>1 ? p[0][0]+". "+p[1] : n;
-}
-
-/* LOAD LOOP */
-function load(){
-  google.script.run.withSuccessHandler(render).getData();
-}
-
-setInterval(load, 5000);
-load();
+loadData();
 
 </script>
 

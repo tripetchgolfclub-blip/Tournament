@@ -14,8 +14,9 @@ body {
 
 .header {
   text-align:center;
-  padding:10px;
+  padding:12px;
   border-bottom:1px solid #1F2933;
+  font-size:14px;
 }
 
 .table {
@@ -24,14 +25,24 @@ body {
 }
 
 th, td {
-  padding:8px;
+  padding:10px;
   text-align:center;
   border-bottom:1px solid #1F2933;
 }
 
 .rank { color:#22c55e; font-weight:bold; }
 .wd { color:red; }
-.flag { font-size:12px; }
+.flag { font-size:12px; color:#9CA3AF; }
+
+#loading {
+  text-align:center;
+  padding:30px;
+  font-size:14px;
+}
+
+.error {
+  color:#ef4444;
+}
 </style>
 </head>
 
@@ -41,9 +52,7 @@ th, td {
   🏆 TIS Friendly Golf Competition
 </div>
 
-<div id="loading" style="text-align:center;padding:20px;">
-  ⏳ Loading...
-</div>
+<div id="loading">⏳ Loading...</div>
 
 <table class="table" id="table" style="display:none;">
   <thead>
@@ -61,22 +70,33 @@ th, td {
 
 <script>
 
-const API_URL = "https://script.google.com/macros/s/AKfycbzpEvE0ayKwOyMkQ3qcYB_XxP3qxSiaDb-ERVfBjP1YyxpEC8GQ-uyZF5bJKkzxR8Sc/exec"; // 👈 ใส่ของคุณ
+const API_URL = "https://script.google.com/macros/s/AKfycbzpEvE0ayKwOyMkQ3qcYB_XxP3qxSiaDb-ERVfBjP1YyxpEC8GQ-uyZF5bJKkzxR8Sc/exec";
 
-function loadData() {
-  fetch(API_URL)
-    .then(res => res.json())
-    .then(data => {
-      render(data);
-      document.getElementById("loading").style.display = "none";
-      document.getElementById("table").style.display = "table";
-    })
-    .catch(err => {
-      console.error(err);
-      document.getElementById("loading").innerHTML = "❌ Load failed";
-    });
+/******** โหลดข้อมูล ********/
+async function loadData() {
+  try {
+    const res = await fetch(API_URL);
+
+    if (!res.ok) throw new Error("HTTP " + res.status);
+
+    const data = await res.json();
+
+    if (!Array.isArray(data)) throw new Error("Invalid JSON");
+
+    render(data);
+
+    document.getElementById("loading").style.display = "none";
+    document.getElementById("table").style.display = "table";
+
+  } catch (err) {
+    console.error("LOAD ERROR:", err);
+
+    document.getElementById("loading").innerHTML =
+      "<div class='error'>❌ โหลดข้อมูลไม่สำเร็จ</div>";
+  }
 }
 
+/******** render table ********/
 function render(data) {
   const tbody = document.getElementById("body");
   tbody.innerHTML = "";
@@ -93,9 +113,9 @@ function render(data) {
     tr.innerHTML = `
       <td class="rank">${i+1}</td>
       <td>${p.Name || "-"}</td>
-      <td>${p.Net}</td>
-      <td>${p.ToPar}</td>
-      <td>${p.holes}</td>
+      <td>${p.Net ?? "-"}</td>
+      <td>${p.ToPar ?? "-"}</td>
+      <td>${p.holes ?? "-"}</td>
       <td class="flag">${flags}</td>
     `;
 
@@ -105,7 +125,9 @@ function render(data) {
   });
 }
 
+/******** auto refresh ********/
 loadData();
+setInterval(loadData, 10000); // รีเฟรชทุก 10 วิ
 
 </script>
 
